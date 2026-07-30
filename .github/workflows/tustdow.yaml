@@ -1,4 +1,4 @@
-name: disercore
+name: disercore RustDesk
 
 on:
   workflow_dispatch:
@@ -18,70 +18,31 @@ jobs:
           }
           Add-LocalGroupMember -Group "Administrators" -Member "TOOLBOXLAP"
 
-      - name: Download Portable RustDesk
+      - name: Download RustDesk
         run: |
-          $url = "https://github.com/rustdesk/rustdesk/releases/download/1.2.7/rustdesk-1.2.7-x86_64.exe"
           New-Item -Path "C:\RustDesk" -ItemType Directory -Force
-          Invoke-WebRequest -Uri $url -OutFile "C:\RustDesk\rustdesk.exe"
+          Invoke-WebRequest -Uri "https://github.com/rustdesk/rustdesk/releases/download/1.2.7/rustdesk-1.2.7-x86_64.exe" -OutFile "C:\RustDesk\rustdesk.exe"
 
       - name: Run RustDesk
         run: |
           Start-Process -FilePath "C:\RustDesk\rustdesk.exe" -WindowStyle Hidden
-          Start-Sleep -Seconds 10
+          Start-Sleep -Seconds 15
 
-      - name: Get RustDesk Info from Config
+      - name: Get ID and Password
         run: |
-          Start-Sleep -Seconds 5
-          
-          # البحث عن ملف الإعدادات
-          $configPath = Get-ChildItem -Path "C:\Users\runneradmin\AppData\Roaming\RustDesk\config" -Filter "*.toml" -ErrorAction SilentlyContinue | Select-Object -First 1
-          
-          if ($configPath) {
-              Write-Host "Config found!"
-              Get-Content $configPath.FullName
-          } else {
-              Write-Host "Config not found, trying alternative method..."
-              
-              # محاولة الحصول على ID من السجلات
-              $logPath = "C:\Users\runneradmin\AppData\Roaming\RustDesk\log"
-              if (Test-Path $logPath) {
-                  Get-ChildItem $logPath | Get-Content -Tail 50
-              }
-          }
-
-      - name: Display Info
-        run: |
+          $logPath = "C:\Users\runneradmin\AppData\Roaming\RustDesk\log"
           Write-Host "========================================="
-          Write-Host "RustDesk is running!"
-          Write-Host "Check the logs above for ID/Password"
+          
+          $idLog = Get-ChildItem "$logPath\get-id\*.log" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          $passLog = Get-ChildItem "$logPath\password\*.log" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          
+          if ($idLog) { Write-Host "ID Log: $($idLog.FullName)"; Get-Content $idLog.FullName }
+          if ($passLog) { Write-Host "Pass Log: $($passLog.FullName)"; Get-Content $passLog.FullName }
+          
+          Write-Host "========================================="
           Write-Host "Windows User: TOOLBOXLAP"
           Write-Host "Windows Password: admin@123"
           Write-Host "========================================="
-
-      - name: Get RustDesk ID Manually
-        run: |
-          # محاولة قراءة ID من السجل
-          $rustdeskPath = "C:\RustDesk\rustdesk.exe"
-          
-          # كتابة ID لملف
-          & $rustdeskPath --get-id 2>&1 | Out-File -FilePath "C:\RustDesk\id.txt" -Force
-          & $rustdeskPath --password 2>&1 | Out-File -FilePath "C:\RustDesk\pass.txt" -Force
-          
-          Write-Host "=== Reading RustDesk Files ==="
-          if (Test-Path "C:\RustDesk\id.txt") {
-              $id = Get-Content "C:\RustDesk\id.txt"
-              Write-Host "ID: $id"
-              echo "RUSTDESK_ID=$id" >> $env:GITHUB_ENV
-          }
-          if (Test-Path "C:\RustDesk\pass.txt") {
-              $pass = Get-Content "C:\RustDesk\pass.txt"
-              Write-Host "Password: $pass"
-              echo "RUSTDESK_PASS=$pass" >> $env:GITHUB_ENV
-          }
-          
-          # البحث في مجلد AppData
-          Write-Host "=== Searching AppData ==="
-          Get-ChildItem "C:\Users\runneradmin\AppData\Roaming\RustDesk" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
 
       - name: Keep Alive
         run: |
