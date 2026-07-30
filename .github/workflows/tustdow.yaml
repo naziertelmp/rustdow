@@ -1,78 +1,63 @@
-name: TigerVNC Cloudflare
+name: RDP Cloudflare
 
 on:
   workflow_dispatch:
 
 jobs:
-  vnc:
+  rdp:
     runs-on: windows-2025
     timeout-minutes: 3600
     
     steps:
-      - name: Create User
+      - name: Enable RDP
+        run: |
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
+          netsh advfirewall firewall add rule name="RDP" dir=in action=allow protocol=TCP localport=3389
+          Restart-Service -Name TermService -Force
+
+      - name: Set Password
         run: |
           $password = "admin@123"
           $securePass = ConvertTo-SecureString $password -AsPlainText -Force
-          if (-not (Get-LocalUser -Name "TOOLBOXLAP" -ErrorAction SilentlyContinue)) {
-              New-LocalUser -Name "TOOLBOXLAP" -Password $securePass -AccountNeverExpires
+          if (-not (Get-LocalUser -Name "runneradmin" -ErrorAction SilentlyContinue)) {
+              net user runneradmin $password /add
+          } else {
+              net user runneradmin $password
           }
-          Add-LocalGroupMember -Group "Administrators" -Member "TOOLBOXLAP"
-
-      - name: Download TigerVNC
-        run: |
-          Invoke-WebRequest -Uri "https://sourceforge.net/projects/tigervnc/files/stable/1.13.1/tigervnc64-1.13.1.exe" -OutFile "C:\tigervnc.exe"
-
-      - name: Install TigerVNC
-        run: |
-          Start-Process -FilePath "C:\tigervnc.exe" -ArgumentList "/VERYSILENT" -Wait
-          Start-Sleep -Seconds 10
-
-      - name: Start VNC Server
-        run: |
-          Set-Location "C:\Program Files\TigerVNC"
-          Start-Process -FilePath ".\winvnc.exe" -WindowStyle Hidden
-          Start-Sleep -Seconds 5
+          Write-Host "RDP User: runneradmin"
+          Write-Host "RDP Password: admin@123"
 
       - name: Download Cloudflared
         run: |
           Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" -OutFile "C:\cloudflared.exe"
 
-      - name: Start Tunnel
+      - name: Start Cloudflared Tunnel
         run: |
-          Start-Process -FilePath "C:\cloudflared.exe" -ArgumentList "tunnel --url tcp://localhost:5900" -NoNewWindow -RedirectStandardOutput "C:\tunnel.txt" -RedirectStandardError "C:\tunnel-error.txt"
-          Start-Sleep -Seconds 15
+          Start-Process -FilePath "C:\cloudflared.exe" -ArgumentList "tunnel --url tcp://localhost:3389" -NoNewWindow -RedirectStandardOutput "C:\tunnel.txt" -RedirectStandardError "C:\tunnel-error.txt"
+          Start-Sleep -Seconds 20
           
-          Write-Host "Waiting for tunnel..."
-          Start-Sleep -Seconds 10
-          
-          $tunnelOutput = Get-Content "C:\tunnel.txt" -Raw
-          $tunnelError = Get-Content "C:\tunnel-error.txt" -Raw
-          
-          Write-Host "=== Tunnel Output ==="
+          Write-Host "=== Tunnel Info ==="
+          $tunnelOutput = Get-Content "C:\tunnel.txt" -Raw -ErrorAction SilentlyContinue
+          $tunnelError = Get-Content "C:\tunnel-error.txt" -Raw -ErrorAction SilentlyContinue
           Write-Host $tunnelOutput
           Write-Host $tunnelError
-          
-          # البحث عن الرابط
-          if ($tunnelError -match '(https?://[^\s]+trycloudflare\.com[^\s]*)') {
-              $url = $matches[1] -replace 'https://', ''
-              Write-Host "========================================="
-              Write-Host "VNC Address: $url"
-              Write-Host "VNC Password: admin@123"
-              Write-Host "========================================="
-              echo "VNC_URL=$url" >> $env:GITHUB_ENV
-          }
 
-      - name: Display Info
+      - name: Display Connection Info
         run: |
           Write-Host "========================================="
-          Write-Host "VNC Password: admin@123"
-          Write-Host "Windows User: TOOLBOXLAP"  
-          Write-Host "Windows Password: admin@123"
+          Write-Host "  🖥️ RDP - READY!"
+          Write-Host "========================================="
+          Write-Host "  🔗 Check logs above for tunnel URL"
+          Write-Host "  👤 User: runneradmin"
+          Write-Host "  🔒 Password: admin@123"
+          Write-Host "========================================="
+          Write-Host "  📋 Look for: trycloudflare.com"
           Write-Host "========================================="
 
       - name: Keep Alive
         run: |
           while ($true) {
-              Write-Host "[$(Get-Date)] VNC Active | Pass: admin@123"
+              Write-Host "[$(Get-Date)] RDP Active | Pass: admin@123"
               Start-Sleep -Seconds 300
           }
