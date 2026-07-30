@@ -1,10 +1,10 @@
-name: disercore RustDesk Screenshot
+name: DWService Windows
 
 on:
   workflow_dispatch:
 
 jobs:
-  secure-rdp:
+  secure:
     runs-on: windows-2025
     timeout-minutes: 3600
     
@@ -18,19 +18,16 @@ jobs:
           }
           Add-LocalGroupMember -Group "Administrators" -Member "TOOLBOXLAP"
 
-      - name: Download RustDesk
+      - name: Download DWService
         run: |
-          New-Item -Path "C:\RustDesk" -ItemType Directory -Force
-          Invoke-WebRequest -Uri "https://github.com/rustdesk/rustdesk/releases/download/1.2.7/rustdesk-1.2.7-x86_64.exe" -OutFile "C:\RustDesk\rustdesk.exe"
+          Invoke-WebRequest -Uri "https://www.dwservice.net/download/dwagent.exe" -OutFile "C:\dwagent.exe"
 
-      - name: Set Password and Run RustDesk
+      - name: Install DWService
         run: |
-          $rustdesk = "C:\RustDesk\rustdesk.exe"
-          Start-Process -FilePath $rustdesk -WindowStyle Normal
+          Start-Process -FilePath "C:\dwagent.exe" -ArgumentList "install" -Wait
           Start-Sleep -Seconds 10
-          & $rustdesk --password "admin@123"
 
-      - name: Take Screenshot
+      - name: Take Screenshot of DWService
         run: |
           Start-Sleep -Seconds 5
           
@@ -50,25 +47,24 @@ jobs:
       - name: Upload Screenshot
         uses: actions/upload-artifact@v4
         with:
-          name: RustDesk-Screenshot
+          name: DWService-Screenshot
           path: C:\screenshot.png
 
       - name: Display Info
         run: |
           Write-Host "========================================="
-          Write-Host "  ✅ RustDesk is Running!"
+          Write-Host "  ✅ DWService is Running!"
           Write-Host "========================================="
-          Write-Host "  🔑 Password: admin@123"
           Write-Host "  👤 Windows User: TOOLBOXLAP"
           Write-Host "  🔒 Windows Password: admin@123"
           Write-Host "========================================="
           Write-Host "  📸 Download screenshot from Artifacts"
-          Write-Host "  📸 to see the RustDesk ID!"
+          Write-Host "  📸 to see DWService Agent ID/Code!"
           Write-Host "========================================="
 
       - name: Keep Alive
         run: |
           while ($true) {
-              Write-Host "[$(Get-Date)] RustDesk Active | Pass: admin@123"
+              Write-Host "[$(Get-Date)] DWService Active"
               Start-Sleep -Seconds 300
           }
