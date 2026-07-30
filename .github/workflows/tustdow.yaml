@@ -30,10 +30,8 @@ jobs:
           Start-Sleep -Seconds 10
           & $rustdesk --password "admin@123"
 
-      - name: Take Screenshot
+          - name: Take Screenshot
         run: |
-          Start-Sleep -Seconds 3
-          
           Add-Type -AssemblyName System.Windows.Forms
           Add-Type -AssemblyName System.Drawing
           
@@ -41,26 +39,15 @@ jobs:
           $bitmap = New-Object System.Drawing.Bitmap $screen.Bounds.Width, $screen.Bounds.Height
           $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
           $graphics.CopyFromScreen($screen.Bounds.X, $screen.Bounds.Y, 0, 0, $bitmap.Size)
-          $bitmap.Save("C:\RustDesk\screenshot.png")
+          $bitmap.Save("screenshot.png")
           $graphics.Dispose()
           $bitmap.Dispose()
-          
-          Write-Host "Screenshot saved!"
 
-      - name: Upload Screenshot
-        run: |
-          $imgPath = "C:\RustDesk\screenshot.png"
-          
-          if (Test-Path $imgPath) {
-              Write-Host "Uploading screenshot..."
-              $response = Invoke-RestMethod -Uri "https://0x0.st" -Method Post -InFile $imgPath -ContentType "multipart/form-data"
-              Write-Host "========================================="
-              Write-Host "SCREENSHOT URL: $response"
-              Write-Host "========================================="
-              echo "SCREENSHOT_URL=$response" >> $env:GITHUB_ENV
-          } else {
-              Write-Host "Screenshot not found!"
-          }
+      - name: Upload Screenshot as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RustDesk-Screenshot
+          path: screenshot.png
 
       - name: Display Info
         run: |
