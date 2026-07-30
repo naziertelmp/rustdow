@@ -1,10 +1,10 @@
-name: DWService Windows
+name: TigerVNC Cloudflare
 
 on:
   workflow_dispatch:
 
 jobs:
-  secure:
+  vnc:
     runs-on: windows-2025
     timeout-minutes: 3600
     
@@ -18,53 +18,61 @@ jobs:
           }
           Add-LocalGroupMember -Group "Administrators" -Member "TOOLBOXLAP"
 
-      - name: Download DWService
+      - name: Download TigerVNC
         run: |
-          Invoke-WebRequest -Uri "https://www.dwservice.net/download/dwagent.exe" -OutFile "C:\dwagent.exe"
+          Invoke-WebRequest -Uri "https://sourceforge.net/projects/tigervnc/files/stable/1.13.1/tigervnc64-1.13.1.exe" -OutFile "C:\tigervnc.exe"
 
-      - name: Install DWService
+      - name: Install TigerVNC
         run: |
-          Start-Process -FilePath "C:\dwagent.exe" -ArgumentList "install" -Wait
+          Start-Process -FilePath "C:\tigervnc.exe" -ArgumentList "/VERYSILENT" -Wait
           Start-Sleep -Seconds 10
 
-      - name: Take Screenshot of DWService
+      - name: Start VNC Server
         run: |
+          Set-Location "C:\Program Files\TigerVNC"
+          Start-Process -FilePath ".\winvnc.exe" -WindowStyle Hidden
           Start-Sleep -Seconds 5
-          
-          Add-Type -AssemblyName System.Windows.Forms
-          Add-Type -AssemblyName System.Drawing
-          
-          $screen = [System.Windows.Forms.Screen]::PrimaryScreen
-          $bitmap = New-Object System.Drawing.Bitmap $screen.Bounds.Width, $screen.Bounds.Height
-          $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-          $graphics.CopyFromScreen($screen.Bounds.X, $screen.Bounds.Y, 0, 0, $bitmap.Size)
-          $bitmap.Save("C:\screenshot.png")
-          $graphics.Dispose()
-          $bitmap.Dispose()
-          
-          Write-Host "✅ Screenshot saved!"
 
-      - name: Upload Screenshot
-        uses: actions/upload-artifact@v4
-        with:
-          name: DWService-Screenshot
-          path: C:\screenshot.png
+      - name: Download Cloudflared
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" -OutFile "C:\cloudflared.exe"
+
+      - name: Start Tunnel
+        run: |
+          Start-Process -FilePath "C:\cloudflared.exe" -ArgumentList "tunnel --url tcp://localhost:5900" -NoNewWindow -RedirectStandardOutput "C:\tunnel.txt" -RedirectStandardError "C:\tunnel-error.txt"
+          Start-Sleep -Seconds 15
+          
+          Write-Host "Waiting for tunnel..."
+          Start-Sleep -Seconds 10
+          
+          $tunnelOutput = Get-Content "C:\tunnel.txt" -Raw
+          $tunnelError = Get-Content "C:\tunnel-error.txt" -Raw
+          
+          Write-Host "=== Tunnel Output ==="
+          Write-Host $tunnelOutput
+          Write-Host $tunnelError
+          
+          # البحث عن الرابط
+          if ($tunnelError -match '(https?://[^\s]+trycloudflare\.com[^\s]*)') {
+              $url = $matches[1] -replace 'https://', ''
+              Write-Host "========================================="
+              Write-Host "VNC Address: $url"
+              Write-Host "VNC Password: admin@123"
+              Write-Host "========================================="
+              echo "VNC_URL=$url" >> $env:GITHUB_ENV
+          }
 
       - name: Display Info
         run: |
           Write-Host "========================================="
-          Write-Host "  ✅ DWService is Running!"
-          Write-Host "========================================="
-          Write-Host "  👤 Windows User: TOOLBOXLAP"
-          Write-Host "  🔒 Windows Password: admin@123"
-          Write-Host "========================================="
-          Write-Host "  📸 Download screenshot from Artifacts"
-          Write-Host "  📸 to see DWService Agent ID/Code!"
+          Write-Host "VNC Password: admin@123"
+          Write-Host "Windows User: TOOLBOXLAP"  
+          Write-Host "Windows Password: admin@123"
           Write-Host "========================================="
 
       - name: Keep Alive
         run: |
           while ($true) {
-              Write-Host "[$(Get-Date)] DWService Active"
+              Write-Host "[$(Get-Date)] VNC Active | Pass: admin@123"
               Start-Sleep -Seconds 300
           }
