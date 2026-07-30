@@ -1,63 +1,48 @@
-name: RDP Cloudflare
+name: Web Terminal No VPN
 
 on:
   workflow_dispatch:
 
 jobs:
-  rdp:
-    runs-on: windows-2025
-    timeout-minutes: 3600
+  terminal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
     
     steps:
-      - name: Enable RDP
+      - name: Setup
         run: |
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
-          netsh advfirewall firewall add rule name="RDP" dir=in action=allow protocol=TCP localport=3389
-          Restart-Service -Name TermService -Force
-
-      - name: Set Password
-        run: |
-          $password = "admin@123"
-          $securePass = ConvertTo-SecureString $password -AsPlainText -Force
-          if (-not (Get-LocalUser -Name "runneradmin" -ErrorAction SilentlyContinue)) {
-              net user runneradmin $password /add
-          } else {
-              net user runneradmin $password
-          }
-          Write-Host "RDP User: runneradmin"
-          Write-Host "RDP Password: admin@123"
-
-      - name: Download Cloudflared
-        run: |
-          Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" -OutFile "C:\cloudflared.exe"
-
-      - name: Start Cloudflared Tunnel
-        run: |
-          Start-Process -FilePath "C:\cloudflared.exe" -ArgumentList "tunnel --url tcp://localhost:3389" -NoNewWindow -RedirectStandardOutput "C:\tunnel.txt" -RedirectStandardError "C:\tunnel-error.txt"
-          Start-Sleep -Seconds 20
+          sudo apt-get update
+          sudo apt-get install -y curl wget
           
-          Write-Host "=== Tunnel Info ==="
-          $tunnelOutput = Get-Content "C:\tunnel.txt" -Raw -ErrorAction SilentlyContinue
-          $tunnelError = Get-Content "C:\tunnel-error.txt" -Raw -ErrorAction SilentlyContinue
-          Write-Host $tunnelOutput
-          Write-Host $tunnelError
-
-      - name: Display Connection Info
+          sudo useradd -m -s /bin/bash user
+          echo "user:admin@123" | sudo chpasswd
+          sudo usermod -aG sudo user
+          
+          wget https://github.com/tsl0922/ttyd/releases/download/1.7.4/ttyd.x86_64
+          chmod +x ttyd.x86_64
+          sudo mv ttyd.x86_64 /usr/local/bin/ttyd
+          
+          wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared-linux-amd64.deb
+          
+      - name: Start Terminal
         run: |
-          Write-Host "========================================="
-          Write-Host "  🖥️ RDP - READY!"
-          Write-Host "========================================="
-          Write-Host "  🔗 Check logs above for tunnel URL"
-          Write-Host "  👤 User: runneradmin"
-          Write-Host "  🔒 Password: admin@123"
-          Write-Host "========================================="
-          Write-Host "  📋 Look for: trycloudflare.com"
-          Write-Host "========================================="
-
+          nohup ttyd -p 3000 --writable bash > /dev/null 2>&1 &
+          sleep 3
+          
+      - name: Create Tunnel
+        run: |
+          cloudflared tunnel --url http://localhost:3000 2>&1 | tee tunnel.log &
+          sleep 15
+          
+          echo "========================================="
+          echo "  📱 YOUR TERMINAL URL:"
+          grep -o "https://.*\.trycloudflare\.com" tunnel.log | head -1
+          echo "========================================="
+          
       - name: Keep Alive
         run: |
-          while ($true) {
-              Write-Host "[$(Get-Date)] RDP Active | Pass: admin@123"
-              Start-Sleep -Seconds 300
-          }
+          while true; do
+            sleep 300
+            echo "Active"
+          done
