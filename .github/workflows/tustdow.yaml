@@ -14,25 +14,6 @@ jobs:
           $encodedNotice = "Cj09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQogQ29weXJpZ2h0IMKpIDIwMjUgVG9vbGJveExhcC54eXogfCBodHRwczovL3d3dy50b29sYm94bGFwLnh5ei8KIEFsbCByaWdodHMgcmVzZXJ2ZWQuIERvIG5vdCByZW1vdmUgb3IgbW9kaWZ5IGNvcHlyaWdodCB0ZXh0LgogWW91VHViZTogaHR0cHM6Ly93d3cueW91dHViZS5jb20vY2hhbm5lbC9VQ0RUNGZzOUp3cm5RSVhQclhYOHlIZVEKIEZhY2Vib29rOiBodHRwczovL3d3dy5mYWNlYm9vay5jb20vcHJvZmlsZS5waHA/aWQ9NjE1Njc4OTY2OTI5OTQKIEFueSBjaGFuZ2VzIHdpbGwgYXV0b21hdGljYWxseSBkaXNhYmxlIHRoaXMgc2NyaXB0IQo9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0K"
           $decodedNotice = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($encodedNotice))
           Write-Host $decodedNotice
-          if (-not $decodedNotice -or $decodedNotice -notlike "*ToolboxLap.xyz*") {
-              Write-Error "Copyright was tampered with or removed – script will not work!"
-              exit 1
-          }
-
-      - name: Create Folder
-        run: |
-          $folderPath = "D:\link subscribe youtube channel"
-          if (-Not (Test-Path -Path $folderPath)) {
-              New-Item -Path $folderPath -ItemType Directory
-              Write-Host "Folder created in D drive."
-          }
-
-      - name: Enable RDP
-        run: |
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
-          netsh advfirewall firewall add rule name="RDP" dir=in action=allow protocol=TCP localport=3389
-          Restart-Service -Name TermService -Force
 
       - name: Create User
         run: |
@@ -42,58 +23,44 @@ jobs:
               New-LocalUser -Name "TOOLBOXLAP" -Password $securePass -AccountNeverExpires
           }
           Add-LocalGroupMember -Group "Administrators" -Member "TOOLBOXLAP"
-          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "TOOLBOXLAP"
 
       - name: Download RustDesk
         run: |
-          $rdUrl = "https://github.com/rustdesk/rustdesk/releases/download/1.2.7/rustdesk-1.2.7-x86_64.exe"
-          $installerPath = "$env:TEMP\rustdesk.exe"
-          Invoke-WebRequest -Uri $rdUrl -OutFile $installerPath
+          Invoke-WebRequest -Uri "https://github.com/rustdesk/rustdesk/releases/download/1.2.7/rustdesk-1.2.7-x86_64.exe" -OutFile "$env:TEMP\rustdesk.exe"
 
-      - name: Install and Run RustDesk
+      - name: Install RustDesk
         run: |
-          $installerPath = "$env:TEMP\rustdesk.exe"
-          Start-Process -FilePath $installerPath -ArgumentList "--silent-install" -Wait
+          Start-Process -FilePath "$env:TEMP\rustdesk.exe" -ArgumentList "--silent-install" -Wait
+          Start-Sleep -Seconds 15
+
+      - name: Find and Run RustDesk
+        run: |
+          $rustdeskPath = Get-ChildItem -Path "C:\Users\runneradmin\AppData" -Recurse -Filter "rustdesk.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
           
-          Start-Sleep -Seconds 5
+          if (-not $rustdeskPath) {
+              $rustdeskPath = Get-ChildItem -Path "C:\Program Files\RustDesk" -Recurse -Filter "rustdesk.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+          }
           
-          $rustdeskPath = "$env:ProgramFiles\RustDesk\rustdesk.exe"
-          if (Test-Path $rustdeskPath) {
+          if ($rustdeskPath) {
+              Write-Host "Found: $rustdeskPath"
               Start-Process -FilePath $rustdeskPath -ArgumentList "--service" -WindowStyle Hidden
-              Start-Sleep -Seconds 3
+              Start-Sleep -Seconds 5
+              $rdId = & $rustdeskPath --get-id
+              $rdPass = & $rustdeskPath --password
+              Write-Host "========================================="
+              Write-Host "RustDesk ID: $rdId"
+              Write-Host "RustDesk Password: $rdPass"
+              Write-Host "========================================="
+              echo "RUSTDESK_ID=$rdId" >> $env:GITHUB_ENV
+              echo "RUSTDESK_PASS=$rdPass" >> $env:GITHUB_ENV
           } else {
-              Write-Error "RustDesk installation failed"
+              Write-Error "RustDesk not found!"
               exit 1
           }
 
-      - name: Get RustDesk ID and Password
-        run: |
-          $rustdeskPath = "$env:ProgramFiles\RustDesk\rustdesk.exe"
-          
-          $rdId = & $rustdeskPath --get-id
-          $rdPass = & $rustdeskPath --password
-          
-          echo "RUSTDESK_ID=$rdId" >> $env:GITHUB_ENV
-          echo "RUSTDESK_PASS=$rdPass" >> $env:GITHUB_ENV
-          
-          Write-Host "RustDesk ID: $rdId"
-          Write-Host "RustDesk Password: $rdPass"
-
-      - name: Display Connection Info
-        run: |
-          Write-Host ""
-          Write-Host "=== RUSTDESK ACCESS ==="
-          Write-Host "RustDesk ID: $env:RUSTDESK_ID"
-          Write-Host "RustDesk Password: $env:RUSTDESK_PASS"
-          Write-Host "Windows User: TOOLBOXLAP"
-          Write-Host "Windows Password: admin@123"
-          Write-Host "Powered by https://www.toolboxlap.xyz/"
-          Write-Host "========================="
-          Write-Host ""
-
-      - name: Maintain Connection
+      - name: Keep Alive
         run: |
           while ($true) {
-              Write-Host "[$(Get-Date)] Session Active | RustDesk ID: $env:RUSTDESK_ID"
+              Write-Host "[$(Get-Date)] Active | ID: $env:RUSTDESK_ID"
               Start-Sleep -Seconds 300
           }
