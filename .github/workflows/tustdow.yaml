@@ -1,6 +1,38 @@
+name: disercore RustDesk Screenshot
+
+on:
+  workflow_dispatch:
+
+jobs:
+  secure-rdp:
+    runs-on: windows-2025
+    timeout-minutes: 3600
+    
+    steps:
+      - name: Create User
+        run: |
+          $password = "admin@123"
+          $securePass = ConvertTo-SecureString $password -AsPlainText -Force
+          if (-not (Get-LocalUser -Name "TOOLBOXLAP" -ErrorAction SilentlyContinue)) {
+              New-LocalUser -Name "TOOLBOXLAP" -Password $securePass -AccountNeverExpires
+          }
+          Add-LocalGroupMember -Group "Administrators" -Member "TOOLBOXLAP"
+
+      - name: Download RustDesk
+        run: |
+          New-Item -Path "C:\RustDesk" -ItemType Directory -Force
+          Invoke-WebRequest -Uri "https://github.com/rustdesk/rustdesk/releases/download/1.2.7/rustdesk-1.2.7-x86_64.exe" -OutFile "C:\RustDesk\rustdesk.exe"
+
+      - name: Set Password and Run RustDesk
+        run: |
+          $rustdesk = "C:\RustDesk\rustdesk.exe"
+          Start-Process -FilePath $rustdesk -WindowStyle Normal
+          Start-Sleep -Seconds 10
+          & $rustdesk --password "admin@123"
+
       - name: Take Screenshot
         run: |
-          Start-Sleep -Seconds 3
+          Start-Sleep -Seconds 5
           
           Add-Type -AssemblyName System.Windows.Forms
           Add-Type -AssemblyName System.Drawing
@@ -9,37 +41,34 @@
           $bitmap = New-Object System.Drawing.Bitmap $screen.Bounds.Width, $screen.Bounds.Height
           $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
           $graphics.CopyFromScreen($screen.Bounds.X, $screen.Bounds.Y, 0, 0, $bitmap.Size)
-          $bitmap.Save("C:\RustDesk\screenshot.png")
+          $bitmap.Save("C:\screenshot.png")
           $graphics.Dispose()
           $bitmap.Dispose()
           
-          Write-Host "Screenshot saved!"
+          Write-Host "✅ Screenshot saved!"
 
-      - name: Upload Screenshot to ImgBB
+      - name: Upload Screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: RustDesk-Screenshot
+          path: C:\screenshot.png
+
+      - name: Display Info
         run: |
-          $imgPath = "C:\RustDesk\screenshot.png"
-          
-          if (Test-Path $imgPath) {
-              Write-Host "Uploading screenshot to ImgBB..."
-              
-              # تحويل الصورة إلى base64
-              $imgBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($imgPath))
-              
-              # رفع لـ imgbb.com (بدون API key)
-              $body = @{ image = $imgBase64 }
-              $response = Invoke-RestMethod -Uri "https://imgbb.com/json" -Method Post -Body $body -ContentType "application/x-www-form-urlencoded"
-              
-              if ($response.url) {
-                  Write-Host "========================================="
-                  Write-Host "SCREENSHOT URL: $($response.url)"
-                  Write-Host "========================================="
-              } else {
-                  Write-Host "Trying alternative upload..."
-                  
-                  # بديل: transfer.sh
-                  $response = Invoke-RestMethod -Uri "https://transfer.sh" -Method Put -InFile $imgPath -ContentType "image/png"
-                  Write-Host "========================================="
-                  Write-Host "SCREENSHOT URL: $response"
-                  Write-Host "========================================="
-              }
+          Write-Host "========================================="
+          Write-Host "  ✅ RustDesk is Running!"
+          Write-Host "========================================="
+          Write-Host "  🔑 Password: admin@123"
+          Write-Host "  👤 Windows User: TOOLBOXLAP"
+          Write-Host "  🔒 Windows Password: admin@123"
+          Write-Host "========================================="
+          Write-Host "  📸 Download screenshot from Artifacts"
+          Write-Host "  📸 to see the RustDesk ID!"
+          Write-Host "========================================="
+
+      - name: Keep Alive
+        run: |
+          while ($true) {
+              Write-Host "[$(Get-Date)] RustDesk Active | Pass: admin@123"
+              Start-Sleep -Seconds 300
           }
