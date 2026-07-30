@@ -23,30 +23,37 @@ jobs:
           New-Item -Path "C:\RustDesk" -ItemType Directory -Force
           Invoke-WebRequest -Uri "https://github.com/rustdesk/rustdesk/releases/download/1.2.7/rustdesk-1.2.7-x86_64.exe" -OutFile "C:\RustDesk\rustdesk.exe"
 
+      - name: Set RustDesk Password
+        run: |
+          # we
+          & "C:\RustDesk\rustdesk.exe" --password "admin@123"
+          Start-Sleep -Seconds 3
+
       - name: Run RustDesk
         run: |
           Start-Process -FilePath "C:\RustDesk\rustdesk.exe" -WindowStyle Hidden
-          Start-Sleep -Seconds 15
+          Start-Sleep -Seconds 10
 
-      - name: Get ID and Password
+      - name: Get RustDesk ID
         run: |
-          $logPath = "C:\Users\runneradmin\AppData\Roaming\RustDesk\log"
-          Write-Host "========================================="
+          # d ID s
+          & "C:\RustDesk\rustdesk.exe" --get-id > "C:\RustDesk\id_output.txt" 2>&1
+          Start-Sleep -Seconds 2
           
-          $idLog = Get-ChildItem "$logPath\get-id\*.log" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-          $passLog = Get-ChildItem "$logPath\password\*.log" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-          
-          if ($idLog) { Write-Host "ID Log: $($idLog.FullName)"; Get-Content $idLog.FullName }
-          if ($passLog) { Write-Host "Pass Log: $($passLog.FullName)"; Get-Content $passLog.FullName }
+          $output = Get-Content "C:\RustDesk\id_output.txt" -Raw
+          $id = ($output -split '\n' | Select-Object -Last 1).Trim()
           
           Write-Host "========================================="
+          Write-Host "RustDesk ID: $id"
+          Write-Host "RustDesk Password: admin@123"
           Write-Host "Windows User: TOOLBOXLAP"
           Write-Host "Windows Password: admin@123"
           Write-Host "========================================="
+          echo "RUSTDESK_ID=$id" >> $env:GITHUB_ENV
 
       - name: Keep Alive
         run: |
           while ($true) {
-              Write-Host "[$(Get-Date)] RustDesk Active"
+              Write-Host "[$(Get-Date)] ID: $env:RUSTDESK_ID | Pass: admin@123"
               Start-Sleep -Seconds 300
           }
