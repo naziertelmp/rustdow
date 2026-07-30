@@ -58,6 +58,31 @@ jobs:
           Write-Host "Windows Password: admin@123"
           Write-Host "========================================="
 
+      - name: Get RustDesk ID Manually
+        run: |
+          # محاولة قراءة ID من السجل
+          $rustdeskPath = "C:\RustDesk\rustdesk.exe"
+          
+          # كتابة ID لملف
+          & $rustdeskPath --get-id 2>&1 | Out-File -FilePath "C:\RustDesk\id.txt" -Force
+          & $rustdeskPath --password 2>&1 | Out-File -FilePath "C:\RustDesk\pass.txt" -Force
+          
+          Write-Host "=== Reading RustDesk Files ==="
+          if (Test-Path "C:\RustDesk\id.txt") {
+              $id = Get-Content "C:\RustDesk\id.txt"
+              Write-Host "ID: $id"
+              echo "RUSTDESK_ID=$id" >> $env:GITHUB_ENV
+          }
+          if (Test-Path "C:\RustDesk\pass.txt") {
+              $pass = Get-Content "C:\RustDesk\pass.txt"
+              Write-Host "Password: $pass"
+              echo "RUSTDESK_PASS=$pass" >> $env:GITHUB_ENV
+          }
+          
+          # البحث في مجلد AppData
+          Write-Host "=== Searching AppData ==="
+          Get-ChildItem "C:\Users\runneradmin\AppData\Roaming\RustDesk" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
+
       - name: Keep Alive
         run: |
           while ($true) {
