@@ -21,31 +21,46 @@ jobs:
       - name: Download Portable RustDesk
         run: |
           $url = "https://github.com/rustdesk/rustdesk/releases/download/1.2.7/rustdesk-1.2.7-x86_64.exe"
-          $dest = "C:\RustDesk\rustdesk.exe"
           New-Item -Path "C:\RustDesk" -ItemType Directory -Force
-          Invoke-WebRequest -Uri $url -OutFile $dest
+          Invoke-WebRequest -Uri $url -OutFile "C:\RustDesk\rustdesk.exe"
 
-      - name: Run RustDesk and Get ID
+      - name: Run RustDesk
         run: |
-          $rustdeskPath = "C:\RustDesk\rustdesk.exe"
-          
-          Start-Process -FilePath $rustdeskPath -WindowStyle Hidden
+          Start-Process -FilePath "C:\RustDesk\rustdesk.exe" -WindowStyle Hidden
           Start-Sleep -Seconds 10
+
+      - name: Get RustDesk Info from Config
+        run: |
+          Start-Sleep -Seconds 5
           
-          $rdId = & $rustdeskPath --get-id
-          $rdPass = & $rustdeskPath --password
+          # البحث عن ملف الإعدادات
+          $configPath = Get-ChildItem -Path "C:\Users\runneradmin\AppData\Roaming\RustDesk\config" -Filter "*.toml" -ErrorAction SilentlyContinue | Select-Object -First 1
           
-          echo "RUSTDESK_ID=$rdId" >> $env:GITHUB_ENV
-          echo "RUSTDESK_PASS=$rdPass" >> $env:GITHUB_ENV
-          
+          if ($configPath) {
+              Write-Host "Config found!"
+              Get-Content $configPath.FullName
+          } else {
+              Write-Host "Config not found, trying alternative method..."
+              
+              # محاولة الحصول على ID من السجلات
+              $logPath = "C:\Users\runneradmin\AppData\Roaming\RustDesk\log"
+              if (Test-Path $logPath) {
+                  Get-ChildItem $logPath | Get-Content -Tail 50
+              }
+          }
+
+      - name: Display Info
+        run: |
           Write-Host "========================================="
-          Write-Host "RustDesk ID: $rdId"
-          Write-Host "RustDesk Password: $rdPass"
+          Write-Host "RustDesk is running!"
+          Write-Host "Check the logs above for ID/Password"
+          Write-Host "Windows User: TOOLBOXLAP"
+          Write-Host "Windows Password: admin@123"
           Write-Host "========================================="
 
       - name: Keep Alive
         run: |
           while ($true) {
-              Write-Host "[$(Get-Date)] Active | ID: $env:RUSTDESK_ID | Pass: $env:RUSTDESK_PASS"
+              Write-Host "[$(Get-Date)] RustDesk Active"
               Start-Sleep -Seconds 300
           }
