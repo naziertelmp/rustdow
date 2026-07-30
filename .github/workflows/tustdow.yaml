@@ -1,4 +1,4 @@
-name: disercore RustDesk
+name: disercore RustDesk Screenshot
 
 on:
   workflow_dispatch:
@@ -23,37 +23,57 @@ jobs:
           New-Item -Path "C:\RustDesk" -ItemType Directory -Force
           Invoke-WebRequest -Uri "https://github.com/rustdesk/rustdesk/releases/download/1.2.7/rustdesk-1.2.7-x86_64.exe" -OutFile "C:\RustDesk\rustdesk.exe"
 
-      - name: Set RustDesk Password
+      - name: Set Password and Run RustDesk
         run: |
-          # we
-          & "C:\RustDesk\rustdesk.exe" --password "admin@123"
-          Start-Sleep -Seconds 3
-
-      - name: Run RustDesk
-        run: |
-          Start-Process -FilePath "C:\RustDesk\rustdesk.exe" -WindowStyle Hidden
+          $rustdesk = "C:\RustDesk\rustdesk.exe"
+          Start-Process -FilePath $rustdesk -WindowStyle Normal
           Start-Sleep -Seconds 10
+          & $rustdesk --password "admin@123"
 
-      - name: Get RustDesk ID
+      - name: Take Screenshot
         run: |
-          # d ID s
-          & "C:\RustDesk\rustdesk.exe" --get-id > "C:\RustDesk\id_output.txt" 2>&1
-          Start-Sleep -Seconds 2
+          Start-Sleep -Seconds 3
           
-          $output = Get-Content "C:\RustDesk\id_output.txt" -Raw
-          $id = ($output -split '\n' | Select-Object -Last 1).Trim()
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
           
+          $screen = [System.Windows.Forms.Screen]::PrimaryScreen
+          $bitmap = New-Object System.Drawing.Bitmap $screen.Bounds.Width, $screen.Bounds.Height
+          $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+          $graphics.CopyFromScreen($screen.Bounds.X, $screen.Bounds.Y, 0, 0, $bitmap.Size)
+          $bitmap.Save("C:\RustDesk\screenshot.png")
+          $graphics.Dispose()
+          $bitmap.Dispose()
+          
+          Write-Host "Screenshot saved!"
+
+      - name: Upload Screenshot
+        run: |
+          $imgPath = "C:\RustDesk\screenshot.png"
+          
+          if (Test-Path $imgPath) {
+              Write-Host "Uploading screenshot..."
+              $response = Invoke-RestMethod -Uri "https://0x0.st" -Method Post -InFile $imgPath -ContentType "multipart/form-data"
+              Write-Host "========================================="
+              Write-Host "SCREENSHOT URL: $response"
+              Write-Host "========================================="
+              echo "SCREENSHOT_URL=$response" >> $env:GITHUB_ENV
+          } else {
+              Write-Host "Screenshot not found!"
+          }
+
+      - name: Display Info
+        run: |
           Write-Host "========================================="
-          Write-Host "RustDesk ID: $id"
           Write-Host "RustDesk Password: admin@123"
           Write-Host "Windows User: TOOLBOXLAP"
           Write-Host "Windows Password: admin@123"
+          Write-Host "Screenshot: $env:SCREENSHOT_URL"
           Write-Host "========================================="
-          echo "RUSTDESK_ID=$id" >> $env:GITHUB_ENV
 
       - name: Keep Alive
         run: |
           while ($true) {
-              Write-Host "[$(Get-Date)] ID: $env:RUSTDESK_ID | Pass: admin@123"
+              Write-Host "[$(Get-Date)] Active | Screenshot: $env:SCREENSHOT_URL"
               Start-Sleep -Seconds 300
           }
